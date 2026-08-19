@@ -4,10 +4,12 @@ import { createShadowRootUi } from "wxt/utils/content-script-ui/shadow-root";
 import { injectScript } from "wxt/utils/inject-script";
 
 import ScannerWorker from "../workers/scanning.worker?worker&inline";
+import AttachmentWorker from "../workers/attachment.worker?worker&inline";
 import { DomSubmissionPort } from "../lib/bridge/dom-submission-port.js";
 import { ProtectionController, type ScannerPort } from "../lib/controller/protection-controller.js";
 import { loadStoredState } from "../lib/storage/storage.js";
 import { WorkerScanner } from "../lib/workers/worker-scanner.js";
+import { AttachmentWorkerClient } from "../lib/workers/attachment-worker-client.js";
 import shadowStyles from "../ui/shadow.css?inline";
 import { mountProtectionView } from "../ui/mount-protection-view.js";
 
@@ -73,6 +75,10 @@ export default defineContentScript({
         .catch(() => undefined);
     });
     let disposeScanner = (): void => undefined;
+    const attachmentExtractor = new AttachmentWorkerClient(
+      new AttachmentWorker(),
+      browser.runtime.getURL("/"),
+    );
     let scanner: ScannerPort;
     if (
       import.meta.env.MODE === "e2e" &&
@@ -94,6 +100,7 @@ export default defineContentScript({
       locale: stored.settings.locale,
       scanTimeoutMs: 5_000,
       scanner,
+      attachmentExtractor,
       submission,
       view: {
         render: (state, actions) => {
@@ -160,6 +167,7 @@ export default defineContentScript({
       stopCapture();
       stopStatus();
       disposeScanner();
+      attachmentExtractor.dispose();
       ui.remove();
     });
   },

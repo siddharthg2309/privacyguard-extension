@@ -27,6 +27,8 @@
   },
   "devDependencies": {
     "@privacy-guard/privacy-engine": "workspace:*",
+    "@privacy-guard/content-extraction": "workspace:*",
+    "@privacy-guard/ocr": "workspace:*",
     "@privacy-guard/testing-fixtures": "workspace:*",
     "@eslint/js": "10.0.1",
     "@types/node": "24.13.3",

@@ -1,4 +1,8 @@
-import { ContentEnvelopeSchema, PrivacyDecisionSchema } from "@privacy-guard/contracts";
+import {
+  ContentEnvelopeSchema,
+  PrivacyDecisionSchema,
+  type TextFragment,
+} from "@privacy-guard/contracts";
 import { AppConfigSchema } from "@privacy-guard/configuration";
 import { z } from "zod";
 
@@ -31,6 +35,47 @@ export const PageCaptureMessageSchema = z
   })
   .strict();
 export type PageCaptureMessage = z.infer<typeof PageCaptureMessageSchema>;
+
+export type CapturedAttachment = PageAttachment & { file?: File };
+export type CapturedPageSubmission = Omit<PageCaptureMessage, "attachments"> & {
+  attachments: CapturedAttachment[];
+};
+
+export type AttachmentWorkerRequest = {
+  schemaVersion: 1;
+  type: "EXTRACT_ATTACHMENT";
+  requestId: string;
+  attachment: PageAttachment;
+  data: ArrayBuffer;
+  extensionBaseUrl: string;
+};
+
+export type AttachmentWorkerCancel = {
+  schemaVersion: 1;
+  type: "CANCEL_ATTACHMENT";
+  requestId: string;
+};
+
+export type AttachmentWorkerResponse =
+  | {
+      schemaVersion: 1;
+      type: "ATTACHMENT_PROGRESS";
+      requestId: string;
+      stage: "initializing" | "loading_language" | "recognizing";
+      progress: number;
+    }
+  | {
+      schemaVersion: 1;
+      type: "ATTACHMENT_SUCCESS";
+      requestId: string;
+      fragment: TextFragment;
+    }
+  | {
+      schemaVersion: 1;
+      type: "ATTACHMENT_FAILURE";
+      requestId: string;
+      errorCode: string;
+    };
 
 export const PageCommandMessageSchema = z
   .object({

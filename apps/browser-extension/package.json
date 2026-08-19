@@ -14,10 +14,17 @@
   },
   "dependencies": {
     "@privacy-guard/configuration": "workspace:*",
+    "@privacy-guard/content-extraction": "workspace:*",
     "@privacy-guard/contracts": "workspace:*",
+    "@privacy-guard/ocr": "workspace:*",
     "@privacy-guard/privacy-engine": "workspace:*",
+    "@tesseract.js-data/eng": "1.0.0",
+    "mammoth": "1.12.1",
+    "pdfjs-dist": "6.2.108",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "zod": "catalog:"
   },
   "devDependencies": {

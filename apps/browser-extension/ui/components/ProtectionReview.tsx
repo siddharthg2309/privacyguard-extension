@@ -69,11 +69,13 @@ export function ProtectionReview({
         ? "This submission is blocked"
         : "Review sensitive details";
   const unavailableDescription =
-    state.errorCode === "ATTACHMENT_INSPECTION_UNAVAILABLE"
-      ? "The attachment is still held locally, but this version cannot inspect its contents. Remove it and try again."
-      : state.errorCode === "ADAPTER_RESUME_FAILED"
-        ? "The page changed before the approved content could continue. Nothing was sent; review the current composer and try again."
-        : "The local scanner or page adapter could not produce a trustworthy result. The submission was cancelled.";
+    state.errorCode?.startsWith("INPUT_") === true
+      ? "An attachment could not be safely inspected within the supported format and size limits. Nothing was sent. Remove or replace it and try again."
+      : state.errorCode?.startsWith("OCR_") === true || state.errorCode === "ATTACHMENT_TIMEOUT"
+        ? "Local image text recognition could not finish safely. Nothing was sent. Remove or replace the attachment and try again."
+        : state.errorCode === "ADAPTER_RESUME_FAILED"
+          ? "The page changed before the approved content could continue. Nothing was sent; review the current composer and try again."
+          : "The local scanner or page adapter could not produce a trustworthy result. The submission was cancelled.";
 
   return (
     <div className="backdrop">
@@ -88,14 +90,27 @@ export function ProtectionReview({
         <div className="circuit">Local protection circuit</div>
         <h1 id="privacy-guard-title">{title}</h1>
         <p id="privacy-guard-description" aria-live="polite">
-          {scanning && "The prompt is held locally while the privacy engine checks it."}
+          {scanning &&
+            (state.progress?.label ??
+              "The prompt is held locally while the privacy engine checks it.")}
           {review &&
             "Potentially sensitive details were found. Review the exact sanitized version before continuing."}
           {state.status === "BLOCKED" &&
-            "A critical secret or credential was detected. Nothing has been transmitted."}
+            (state.decision?.explanationCodes.includes("ATTACHMENT_REQUIRES_REMOVAL") === true
+              ? "Sensitive data was detected inside an attachment. Nothing was transmitted; remove or replace the file before trying again."
+              : "A critical secret or credential was detected. Nothing has been transmitted.")}
           {unavailable && unavailableDescription}
         </p>
-        {scanning && <div className="progress" aria-label="Scanning locally" />}
+        {scanning && (
+          <div
+            className="progress"
+            aria-label="Scanning locally"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round((state.progress?.value ?? 0) * 100)}
+          />
+        )}
         {categories.length > 0 && (
           <ul className="risk" aria-label="Detected categories">
             {categories.map((category) => (

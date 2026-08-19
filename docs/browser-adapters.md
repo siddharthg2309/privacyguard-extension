@@ -69,15 +69,15 @@ The adapter understands Gemini's Quill editor, button workflow, unmodified Enter
 
 ## Attachments
 
-The adapters detect attachment metadata and prevent the submission from continuing. Because Phase 6 extraction and OCR are not implemented yet, the extension reports `ATTACHMENT_INSPECTION_UNAVAILABLE`. It never treats an uninspected attachment as safe.
+The adapters serialize attachment metadata across the main-world bridge. The isolated content script matches that metadata to the real browser `File` and sends its bytes only to the extension's local Phase 6 extraction worker. It never treats an unreadable or uninspected attachment as safe.
 
 ## Support matrix
 
-| Site    | Domain                                  | Button    | Enter     | Shift+Enter | SPA replacement | Attachments                     |
-| ------- | --------------------------------------- | --------- | --------- | ----------- | --------------- | ------------------------------- |
-| ChatGPT | `chatgpt.com`, legacy `chat.openai.com` | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
-| Claude  | `claude.ai`                             | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
-| Gemini  | `gemini.google.com`                     | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
+| Site    | Domain                                  | Button    | Enter     | Shift+Enter | SPA replacement | Attachments                                |
+| ------- | --------------------------------------- | --------- | --------- | ----------- | --------------- | ------------------------------------------ |
+| ChatGPT | `chatgpt.com`, legacy `chat.openai.com` | Protected | Protected | Preserved   | Protected       | Locally inspected; sensitive files blocked |
+| Claude  | `claude.ai`                             | Protected | Protected | Preserved   | Protected       | Locally inspected; sensitive files blocked |
+| Gemini  | `gemini.google.com`                     | Protected | Protected | Preserved   | Protected       | Locally inspected; sensitive files blocked |
 
 Retry, regenerate, stop-response, voice, and model/tool controls are not new prompt submissions and are intentionally outside the interception selectors. Pasted text is read from the same composer at submission time and receives the same scan as typed text.
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { defineConfig } from "wxt";
 
 const supportedHosts = [
@@ -6,9 +8,26 @@ const supportedHosts = [
   "https://claude.ai/*",
   "https://gemini.google.com/*",
 ];
+const require = createRequire(import.meta.url);
+const englishModelPath =
+  require.resolve("@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz");
 
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
+  vite: () => ({
+    plugins: [
+      {
+        name: "bundle-local-english-ocr-model",
+        buildStart() {
+          this.emitFile({
+            type: "asset",
+            fileName: "assets/tessdata/eng.traineddata.gz",
+            source: readFileSync(englishModelPath),
+          });
+        },
+      },
+    ],
+  }),
   manifest: {
     name: "AI Privacy Firewall",
     short_name: "Privacy Firewall",
@@ -28,7 +47,7 @@ export default defineConfig({
     },
     web_accessible_resources: [
       {
-        resources: ["main-world.js"],
+        resources: ["main-world.js", "assets/*"],
         matches: supportedHosts,
       },
     ],

@@ -21,12 +21,14 @@ export type ProtectionState = {
   originalContent?: string;
   decision?: PrivacyDecision;
   errorCode?: string;
+  progress?: { label: string; value: number };
 };
 
 export type ProtectionEvent =
   | { type: "INTERCEPT"; requestId: string }
   | { type: "CAPTURE"; requestId: string; content: string }
   | { type: "START_SCAN"; requestId: string }
+  | { type: "SCAN_PROGRESS"; requestId: string; label: string; value: number }
   | { type: "SCAN_DECIDED"; requestId: string; decision: PrivacyDecision }
   | { type: "SCAN_FAILED"; requestId: string; errorCode: string }
   | { type: "MARK_UNAVAILABLE"; requestId: string; errorCode: string }
@@ -91,6 +93,10 @@ export function transitionProtectionState(
     case "START_SCAN":
       return state.status === "CAPTURING_CONTENT"
         ? success({ ...state, status: "SCANNING" })
+        : invalid(state);
+    case "SCAN_PROGRESS":
+      return state.status === "SCANNING"
+        ? success({ ...state, progress: { label: event.label, value: event.value } })
         : invalid(state);
     case "SCAN_DECIDED": {
       if (state.status !== "SCANNING") return invalid(state);

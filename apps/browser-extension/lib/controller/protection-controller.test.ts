@@ -2,7 +2,11 @@ import { createEnvelope } from "@privacy-guard/testing-fixtures";
 import { privacyEngine } from "@privacy-guard/privacy-engine";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PageAttachment, PageCaptureMessage } from "../contracts/messages.js";
+import type {
+  CapturedPageSubmission,
+  PageAttachment,
+  PageCaptureMessage,
+} from "../contracts/messages.js";
 import type { ProtectionState } from "../state/protection-machine.js";
 import { ProtectionController, type ScannerPort } from "./protection-controller.js";
 
@@ -38,6 +42,19 @@ function setup(scanner: ScannerPort) {
     view: { render: (state) => states.push(state) },
   });
   return { controller, resumes, cancellations, states };
+}
+
+function capturedAttachment(name = "notes.txt"): CapturedPageSubmission {
+  const base = capture("Review this file", [
+    { id: "file-1", name, mediaType: "text/plain", sizeBytes: 32 },
+  ]);
+  return {
+    ...base,
+    attachments: base.attachments.map((item) => ({
+      ...item,
+      file: new File(["Contact person@example.com"], name, { type: "text/plain" }),
+    })),
+  };
 }
 
 describe("protection controller", () => {
@@ -125,6 +142,83 @@ describe("protection controller", () => {
     expect(cancel).toHaveBeenCalledOnce();
     expect(onProtectionUnavailable).toHaveBeenCalledWith("ATTACHMENT_INSPECTION_UNAVAILABLE");
     expect(controller.getState().status).toBe("PROTECTION_UNAVAILABLE");
+  });
+
+  it("blocks a sensitive attachment without offering prompt-only redaction", async () => {
+    const resume = vi.fn();
+    const controller = new ProtectionController({
+      locale: "en-US",
+      scanTimeoutMs: 100,
+      scanner: { scan: async (envelope, signal) => privacyEngine.scan(envelope, signal) },
+      attachmentExtractor: {
+        extract: vi.fn().mockResolvedValue([
+          {
+            id: "attachment:file-1",
+            kind: "file",
+            content: "Contact person@example.com",
+            label: "notes.txt",
+          },
+        ]),
+      },
+      submission: { resume, cancel: vi.fn() },
+      view: { render: vi.fn() },
+    });
+    await controller.handleCapture(capturedAttachment());
+    expect(controller.getState()).toMatchObject({ status: "BLOCKED" });
+    expect(controller.getState().decision?.sanitizedContent).toBeUndefined();
+    expect(controller.getState().decision?.explanationCodes).toContain(
+      "ATTACHMENT_REQUIRES_REMOVAL",
+    );
+    expect(resume).not.toHaveBeenCalled();
+  });
+
+  it("resumes a safe prompt with a locally inspected safe attachment", async () => {
+    const resume = vi.fn().mockResolvedValue(undefined);
+    const controller = new ProtectionController({
+      locale: "en-US",
+      scanTimeoutMs: 100,
+      scanner: { scan: async (envelope, signal) => privacyEngine.scan(envelope, signal) },
+      attachmentExtractor: {
+        extract: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "attachment:file-1", kind: "file", content: "Public release notes" },
+          ]),
+      },
+      submission: { resume, cancel: vi.fn() },
+      view: { render: vi.fn() },
+    });
+    const input = capturedAttachment("notes.txt");
+    await controller.handleCapture(input);
+    expect(controller.getState().status).toBe("COMPLETE");
+    expect(resume).toHaveBeenCalledWith(input.requestId, "Review this file");
+  });
+
+  it("fails closed with the extraction error code when a document is malformed", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const unavailable = vi.fn().mockResolvedValue(undefined);
+    const controller = new ProtectionController({
+      locale: "en-US",
+      scanTimeoutMs: 100,
+      scanner: { scan: vi.fn() },
+      attachmentExtractor: {
+        extract: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("malformed"), { code: "INPUT_DOCUMENT_MALFORMED" }),
+          ),
+      },
+      submission: { resume: vi.fn(), cancel },
+      view: { render: vi.fn() },
+      onProtectionUnavailable: unavailable,
+    });
+    await controller.handleCapture(capturedAttachment("broken.docx"));
+    expect(controller.getState()).toMatchObject({
+      status: "PROTECTION_UNAVAILABLE",
+      errorCode: "INPUT_DOCUMENT_MALFORMED",
+    });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(unavailable).toHaveBeenCalledWith("INPUT_DOCUMENT_MALFORMED");
   });
 
   it("does not complete when the page adapter fails to resume", async () => {

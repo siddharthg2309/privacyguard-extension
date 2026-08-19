@@ -13,11 +13,13 @@ All sensitive processing—including PII detection, secret detection, risk scori
 
 ## Current status
 
-Phases 1 through 5 are complete. The repository contains the shared privacy engine, a production CLI foundation for macOS, Windows, and Linux, the Chromium extension platform, and production adapters for ChatGPT, Claude, and Gemini.
+Phases 1 through 6 are complete. The repository contains the shared privacy engine, a production CLI foundation for macOS, Windows, and Linux, the Chromium extension platform, production adapters for ChatGPT, Claude, and Gemini, and local image/document inspection.
 
 The CLI provides file, directory, workspace, and standard-input scanning; safe redaction previews and explicitly authorized writes; human and versioned JSON output; local configuration; status and doctor checks; ignore rules; bounded streaming; cancellation; stable exit codes; and cross-platform E2E coverage.
 
 The extension platform includes a least-privilege WXT Manifest V3 build, validated main-world/isolated-world messaging, a fail-closed submission state machine, inline scanning worker, isolated Shadow DOM review UI, onboarding, popup, local dashboard, versioned storage, and controlled Chromium E2E tests. Site-specific ChatGPT, Claude, and Gemini adapters protect compatible send-button and Enter workflows, preserve multiline input, survive SPA composer replacement, prevent duplicate continuation, and explicitly disable protection when compatibility cannot be guaranteed.
+
+Phase 6 captures selected browser files locally and supports UTF-8 text/source files, PNG/JPEG/WebP OCR, PDF text extraction with OCR fallback, and DOCX raw-text extraction. Processing is bounded, cancellable, worker-isolated, and fail-closed; all OCR models and document workers are bundled with the extension.
 
 ## Architecture
 
@@ -59,6 +61,7 @@ printf 'Contact person@example.com' | node apps/cli/dist/cli.cjs scan --stdin
 See [the CLI contract](docs/cli.md) for commands, safety behavior, JSON guarantees, and exit codes.
 See [the browser extension platform](docs/browser-extension.md) for architecture, permissions, local development, and current capability boundaries.
 See [the browser adapter contract](docs/browser-adapters.md) for compatibility signals, intercepted ChatGPT workflows, and fail-closed behavior.
+See [local attachment processing](docs/attachment-processing.md) for supported formats, limits, lifecycle, and decision behavior.
 
 Useful commands:
 

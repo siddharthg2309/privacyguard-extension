@@ -20,3 +20,4 @@ catalog:
 
 allowBuilds:
   esbuild: true
+  tesseract.js: false

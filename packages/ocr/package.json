@@ -1,5 +1,5 @@
 {
-  "name": "@privacy-guard/content-extraction",
+  "name": "@privacy-guard/ocr",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,5 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --sourcemap"
-  },
-  "dependencies": {
-    "@privacy-guard/contracts": "workspace:*",
-    "@privacy-guard/ocr": "workspace:*"
   }
 }

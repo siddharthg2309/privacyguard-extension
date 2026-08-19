@@ -8,7 +8,7 @@ import {
   PageCommandMessageSchema,
   PageCommandResultSchema,
   type PageAdapterStatus,
-  type PageCaptureMessage,
+  type CapturedPageSubmission,
 } from "../contracts/messages.js";
 import type { SubmissionPort } from "../controller/protection-controller.js";
 
@@ -19,7 +19,7 @@ export class DomSubmissionPort implements SubmissionPort {
     this.commandTimeoutMs = commandTimeoutMs;
   }
 
-  public onCapture(listener: (capture: PageCaptureMessage) => void): () => void {
+  public onCapture(listener: (capture: CapturedPageSubmission) => void): () => void {
     const handler = (event: Event): void => {
       const detail = (event as CustomEvent<unknown>).detail;
       if (typeof detail !== "string") return;
@@ -30,7 +30,22 @@ export class DomSubmissionPort implements SubmissionPort {
         return;
       }
       const parsed = PageCaptureMessageSchema.safeParse(input);
-      if (parsed.success) listener(parsed.data);
+      if (parsed.success) {
+        const files = [
+          ...document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+        ].flatMap((input) => [...(input.files ?? [])]);
+        const unused = new Set(files);
+        const attachments = parsed.data.attachments.map((attachment) => {
+          const file = [...unused].find(
+            (candidate) =>
+              candidate.name === attachment.name &&
+              (attachment.sizeBytes === undefined || candidate.size === attachment.sizeBytes),
+          );
+          if (file !== undefined) unused.delete(file);
+          return file === undefined ? attachment : { ...attachment, file };
+        });
+        listener({ ...parsed.data, attachments });
+      }
     };
     document.addEventListener(BRIDGE_CAPTURE_EVENT, handler);
     return () => document.removeEventListener(BRIDGE_CAPTURE_EVENT, handler);

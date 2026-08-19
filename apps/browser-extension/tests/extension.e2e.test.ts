@@ -175,6 +175,32 @@ async function transmitted(): Promise<{ content: string; requestId?: string }[]>
   });
 }
 
+function createTextPdf(text: string): Buffer {
+  const escaped = text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  const stream = `BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(Buffer.byteLength(body));
+    body += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets
+    .slice(1)
+    .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+    .join("");
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(body);
+}
+
 test.beforeAll(async () => {
   context = await chromium.launchPersistentContext("", {
     channel: "chromium",
@@ -370,12 +396,41 @@ test("ChatGPT composer replacement during review fails closed", async () => {
   );
 });
 
-test("ChatGPT attachment submission fails closed until attachment inspection ships", async () => {
+test("ChatGPT sensitive text attachment is inspected locally and blocked", async () => {
   await openChatGptHarness();
   await page.getByLabel("Attach test file").setInputFiles({
-    name: "private.pdf",
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Contact person@example.com"),
+  });
+  await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Review this file");
+  await page.getByRole("button", { name: "Send prompt" }).click();
+
+  await expect(page.getByRole("heading", { name: "This submission is blocked" })).toBeVisible();
+  await expect(page.locator("#transmission-count")).toHaveText("0");
+  await expect(page.getByRole("button", { name: "Send sanitized version" })).toBeHidden();
+});
+
+test("ChatGPT safe text attachment resumes exactly once", async () => {
+  await openChatGptHarness();
+  await page.getByLabel("Attach test file").setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Public documentation about binary search"),
+  });
+  await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Review this file");
+  await page.getByRole("button", { name: "Send prompt" }).click();
+
+  await expect(page.locator("#transmission-count")).toHaveText("1");
+  expect(await transmitted()).toEqual([{ content: "Review this file" }]);
+});
+
+test("ChatGPT malformed PDF fails closed with a stable input error", async () => {
+  await openChatGptHarness();
+  await page.getByLabel("Attach test file").setInputFiles({
+    name: "broken.pdf",
     mimeType: "application/pdf",
-    buffer: Buffer.from("synthetic fixture"),
+    buffer: Buffer.from("%PDF-not-a-real-document"),
   });
   await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Review this file");
   await page.getByRole("button", { name: "Send prompt" }).click();
@@ -384,8 +439,51 @@ test("ChatGPT attachment submission fails closed until attachment inspection shi
   await expect(page.locator("#transmission-count")).toHaveText("0");
   await expect(page.locator("html")).toHaveAttribute(
     "data-privacy-guard-compatibility-error",
-    "ATTACHMENT_INSPECTION_UNAVAILABLE",
+    "INPUT_DOCUMENT_MALFORMED",
   );
+});
+
+test("ChatGPT PDF text is extracted locally and sensitive content is blocked", async () => {
+  await openChatGptHarness();
+  await page.getByLabel("Attach test file").setInputFiles({
+    name: "contact.pdf",
+    mimeType: "application/pdf",
+    buffer: createTextPdf("person@example.com"),
+  });
+  await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Review this PDF");
+  await page.getByRole("button", { name: "Send prompt" }).click();
+
+  await expect(page.getByRole("heading", { name: "This submission is blocked" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator("#transmission-count")).toHaveText("0");
+});
+
+test("ChatGPT image attachment uses bundled local OCR and blocks detected email", async () => {
+  test.setTimeout(60_000);
+  await openChatGptHarness();
+  const fixture = page.locator("body").evaluate(() => {
+    const imageText = document.createElement("div");
+    imageText.id = "ocr-fixture";
+    imageText.textContent = "person@example.com";
+    imageText.style.cssText =
+      "display:inline-block;padding:40px;background:white;color:black;font:700 52px monospace";
+    document.body.append(imageText);
+  });
+  await fixture;
+  const buffer = await page.locator("#ocr-fixture").screenshot();
+  await page.locator("#ocr-fixture").evaluate((element) => element.remove());
+  await page.getByLabel("Attach test file").setInputFiles({
+    name: "contact.png",
+    mimeType: "image/png",
+    buffer,
+  });
+  await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Read this image");
+  await page.getByRole("button", { name: "Send prompt" }).click();
+
+  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("heading", { name: "This submission is blocked" })).toBeVisible();
+  await expect(page.locator("#transmission-count")).toHaveText("0");
 });
 
 test("incompatible ChatGPT DOM is explicitly marked unavailable", async () => {
@@ -469,22 +567,19 @@ for (const site of phaseFiveSites) {
       expect(await transmitted()).toEqual([{ content: "[EMAIL]" }]);
     });
 
-    test("attachment submission fails closed", async () => {
+    test("sensitive text attachment is inspected locally and blocked", async () => {
       await openPhaseFiveHarness(site);
       await page.getByLabel("Attach test file").setInputFiles({
-        name: "private.pdf",
-        mimeType: "application/pdf",
-        buffer: Buffer.from("synthetic fixture"),
+        name: "notes.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("Contact person@example.com"),
       });
       await page.getByRole("textbox", { name: site.composerName }).fill("Review this file");
       await page.getByRole("button", { name: site.sendName }).click();
 
-      await expect(page.getByRole("heading", { name: "Protection is unavailable" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "This submission is blocked" })).toBeVisible();
       await expect(page.locator("#transmission-count")).toHaveText("0");
-      await expect(page.locator("html")).toHaveAttribute(
-        "data-privacy-guard-compatibility-error",
-        "ATTACHMENT_INSPECTION_UNAVAILABLE",
-      );
+      await expect(page.getByRole("button", { name: "Send sanitized version" })).toBeHidden();
     });
 
     test("incompatible DOM is explicitly unavailable", async () => {
