@@ -8,6 +8,9 @@ artifacts/*
 .vite/
 .wxt/
 .output/
+test-results/
+playwright-report/
+blob-report/
 *.tsbuildinfo
 *.log
 .DS_Store

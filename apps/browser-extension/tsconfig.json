@@ -1,0 +1,11 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": true,
+    "jsx": "react-jsx",
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".wxt/**/*.d.ts"],
+  "exclude": [".output", "node_modules"]
+}

@@ -13,11 +13,11 @@ All sensitive processing—including PII detection, secret detection, risk scori
 
 ## Current status
 
-Phases 1 and 2 are complete. The repository contains the shared privacy engine plus a production CLI foundation for macOS, Windows, and Linux.
+Phases 1, 2, and 3 are complete. The repository contains the shared privacy engine, a production CLI foundation for macOS, Windows, and Linux, and the Chromium extension platform.
 
 The CLI provides file, directory, workspace, and standard-input scanning; safe redaction previews and explicitly authorized writes; human and versioned JSON output; local configuration; status and doctor checks; ignore rules; bounded streaming; cancellation; stable exit codes; and cross-platform E2E coverage.
 
-The Chromium extension will be built on top of the same shared engine in the next production milestone.
+The extension platform includes a least-privilege WXT Manifest V3 build, validated main-world/isolated-world messaging, a fail-closed submission state machine, inline scanning worker, isolated Shadow DOM review UI, onboarding, popup, local dashboard, versioned storage, and controlled Chromium E2E tests. Live ChatGPT, Claude, and Gemini adapters are intentionally not claimed yet; they are Phases 4 and 5.
 
 ## Architecture
 
@@ -44,6 +44,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 pnpm build
 pnpm test:e2e:cli
+pnpm test:e2e:browser
 ```
 
 Build and try the CLI:
@@ -56,6 +57,7 @@ printf 'Contact person@example.com' | node apps/cli/dist/cli.cjs scan --stdin
 ```
 
 See [the CLI contract](docs/cli.md) for commands, safety behavior, JSON guarantees, and exit codes.
+See [the browser extension platform](docs/browser-extension.md) for architecture, permissions, local development, and current capability boundaries.
 
 Useful commands:
 

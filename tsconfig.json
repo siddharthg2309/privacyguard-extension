@@ -5,11 +5,11 @@
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    "apps/**/*.ts",
-    "apps/**/*.tsx",
+    "apps/cli/**/*.ts",
     "benchmarks/**/*.ts",
     "packages/**/*.ts",
     "packages/**/*.tsx",
     "*.ts"
-  ]
+  ],
+  "exclude": ["apps/browser-extension/**"]
 }

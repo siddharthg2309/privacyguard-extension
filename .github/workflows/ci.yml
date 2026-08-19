@@ -41,6 +41,39 @@ jobs:
       - name: Package CLI
         run: pnpm package:cli
 
+      - name: Package browser extension
+        run: pnpm package:browser
+
+  browser-e2e:
+    name: Chromium extension E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @privacy-guard/browser-extension exec playwright install --with-deps chromium
+
+      - name: Run controlled extension E2E tests
+        run: pnpm test:e2e:browser
+
   cli-e2e:
     name: CLI E2E (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
