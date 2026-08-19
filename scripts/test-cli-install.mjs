@@ -69,11 +69,30 @@ async function commandWithInput(arguments_, input) {
   });
 }
 
+async function installPackage(additionalArguments = []) {
+  const arguments_ = [
+    "install",
+    "--global",
+    "--cache",
+    npmCache,
+    "--prefix",
+    prefix,
+    archive,
+    ...additionalArguments,
+  ];
+  if (process.platform !== "win32") {
+    return execute("npm", arguments_, { env: runtimeEnvironment });
+  }
+
+  const locatedNpm = await execute("where.exe", ["npm.cmd"], { env: runtimeEnvironment });
+  const npmCommand = locatedNpm.stdout.split(/\r?\n/u).find((value) => value.trim().length > 0);
+  if (!npmCommand) throw new Error("Could not locate npm.cmd on Windows.");
+  const npmCli = join(dirname(npmCommand.trim()), "node_modules", "npm", "bin", "npm-cli.js");
+  return execute(process.execPath, [npmCli, ...arguments_], { env: runtimeEnvironment });
+}
+
 try {
-  await execute("npm", ["install", "--global", "--cache", npmCache, "--prefix", prefix, archive], {
-    env: runtimeEnvironment,
-    shell: process.platform === "win32",
-  });
+  await installPackage();
   const version = await command(["--version"]);
   if (version.stdout.trim() !== packageMetadata.version)
     throw new Error("Installed version mismatch.");
@@ -152,11 +171,7 @@ try {
   }
 
   // A reinstall exercises the supported in-place upgrade mechanism and must preserve config.
-  await execute(
-    "npm",
-    ["install", "--global", "--cache", npmCache, "--prefix", prefix, archive, "--force"],
-    { env: runtimeEnvironment, shell: process.platform === "win32" },
-  );
+  await installPackage(["--force"]);
   await command(["--config", config, "config", "validate"]);
   process.stdout.write("Packaged CLI install, commands, redaction, and reinstall checks passed.\n");
 } finally {
