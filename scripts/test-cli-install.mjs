@@ -62,6 +62,7 @@ async function commandWithInput(arguments_, input) {
 try {
   await execute("npm", ["install", "--global", "--cache", npmCache, "--prefix", prefix, archive], {
     env: runtimeEnvironment,
+    shell: process.platform === "win32",
   });
   const version = await command(["--version"]);
   if (version.stdout.trim() !== packageMetadata.version)
@@ -144,7 +145,7 @@ try {
   await execute(
     "npm",
     ["install", "--global", "--cache", npmCache, "--prefix", prefix, archive, "--force"],
-    { env: runtimeEnvironment },
+    { env: runtimeEnvironment, shell: process.platform === "win32" },
   );
   await command(["--config", config, "config", "validate"]);
   process.stdout.write("Packaged CLI install, commands, redaction, and reinstall checks passed.\n");
