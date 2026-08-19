@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "benchmarks/**/*.ts",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "*.ts"
+  ]
+}

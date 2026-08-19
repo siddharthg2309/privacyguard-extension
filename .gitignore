@@ -1,0 +1,21 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.turbo/
+.vite/
+.wxt/
+.output/
+*.tsbuildinfo
+*.log
+.DS_Store
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+
+# Local planning documents; README.md remains public.
+project.md
+project_understanding.md
+project_implementation.md

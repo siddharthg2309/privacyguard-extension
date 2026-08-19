@@ -1,0 +1,19 @@
+{
+  "name": "@privacy-guard/pii-detection",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap"
+  },
+  "dependencies": {
+    "@privacy-guard/contracts": "workspace:*",
+    "libphonenumber-js": "catalog:"
+  },
+  "devDependencies": {
+    "@privacy-guard/testing-fixtures": "workspace:*"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@privacy-guard/privacy-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap"
+  },
+  "dependencies": {
+    "@privacy-guard/configuration": "workspace:*",
+    "@privacy-guard/content-extraction": "workspace:*",
+    "@privacy-guard/contracts": "workspace:*",
+    "@privacy-guard/file-classification": "workspace:*",
+    "@privacy-guard/pii-detection": "workspace:*",
+    "@privacy-guard/policy-engine": "workspace:*",
+    "@privacy-guard/redaction-engine": "workspace:*",
+    "@privacy-guard/risk-engine": "workspace:*",
+    "@privacy-guard/safe-logging": "workspace:*",
+    "@privacy-guard/secret-detection": "workspace:*"
+  },
+  "devDependencies": {
+    "@privacy-guard/testing-fixtures": "workspace:*"
+  }
+}
