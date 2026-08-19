@@ -97,11 +97,12 @@ for (const packageDirectory of packageDirectories) {
         const metadata = JSON.parse(readFileSync(packageJson, "utf8"));
         if (typeof metadata.name !== "string" || typeof metadata.version !== "string") continue;
         const key = `${metadata.name}@${metadata.version}`;
+        const packageUrlName = metadata.name.split("/").map(encodeURIComponent).join("/");
         components.set(key, {
           type: "library",
           name: metadata.name,
           version: metadata.version,
-          purl: `pkg:npm/${metadata.name.replace("/", "%2F")}@${metadata.version}`,
+          purl: `pkg:npm/${packageUrlName}@${encodeURIComponent(metadata.version)}`,
         });
       }
     } catch {
