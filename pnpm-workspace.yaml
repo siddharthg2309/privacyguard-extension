@@ -21,3 +21,6 @@ catalog:
 allowBuilds:
   esbuild: true
   tesseract.js: false
+
+overrides:
+  esbuild: 0.28.2

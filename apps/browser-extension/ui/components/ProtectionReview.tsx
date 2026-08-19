@@ -26,8 +26,10 @@ export function ProtectionReview({
   useEffect(() => {
     if (!visible) return;
     const container = dialog.current;
-    const previous =
-      document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    const rootNode = container?.getRootNode();
+    const activeElement =
+      rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
+    const previous = activeElement instanceof HTMLElement ? activeElement : undefined;
     container?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     const handleKey = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
@@ -42,17 +44,19 @@ export function ProtectionReview({
       const first = focusable[0];
       const last = focusable.at(-1);
       if (first === undefined || last === undefined) return;
-      if (event.shiftKey && document.activeElement === first) {
+      const focused =
+        rootNode instanceof ShadowRoot ? rootNode.activeElement : document.activeElement;
+      if (event.shiftKey && focused === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && focused === last) {
         event.preventDefault();
         first.focus();
       }
     };
-    document.addEventListener("keydown", handleKey);
+    container?.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener("keydown", handleKey);
+      container?.removeEventListener("keydown", handleKey);
       previous?.focus();
     };
   }, [actions, visible]);

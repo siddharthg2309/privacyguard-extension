@@ -19,6 +19,79 @@ function capture(): { output: string[]; errors: string[] } {
 }
 
 describe("CLI program", () => {
+  it("scans a verified Codex prompt and workspace before forwarding its exit code", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "aiprivacy-agent-safe-"));
+    temporaryDirectories.push(directory);
+    await writeFile(join(directory, "README.md"), "A safe local project.", "utf8");
+    const writes = capture();
+    const launches: string[][] = [];
+    const exitCode = await runCli(["run", "--", "codex", "exec", "Explain binary search."], {
+      cwd: directory,
+      launchAgent: (plan) => {
+        launches.push([...plan.command]);
+        return Promise.resolve(37);
+      },
+      writeOut: (value) => writes.output.push(value),
+      writeError: (value) => writes.errors.push(value),
+      isInteractive: false,
+    });
+    expect(exitCode).toBe(37);
+    expect(launches).toEqual([["codex", "exec", "Explain binary search."]]);
+    expect(writes.errors.join("")).toContain("Protected adapter: codex-exec/v1");
+    expect(writes.errors.join("")).toContain("ALLOW run");
+  });
+
+  it("blocks a sensitive agent prompt before the process is created", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "aiprivacy-agent-block-"));
+    temporaryDirectories.push(directory);
+    const writes = capture();
+    let launched = false;
+    const secret = `sk-proj-${"A1b2".repeat(8)}`;
+    const exitCode = await runCli(
+      ["--format", "json", "run", "--", "codex", "exec", `Use ${secret}`],
+      {
+        cwd: directory,
+        launchAgent: () => {
+          launched = true;
+          return Promise.resolve(0);
+        },
+        writeOut: (value) => writes.output.push(value),
+        writeError: (value) => writes.errors.push(value),
+        isInteractive: false,
+      },
+    );
+    expect(exitCode).toBe(ExitCode.policyViolation);
+    expect(launched).toBe(false);
+    expect(JSON.parse(writes.errors.join(""))).toMatchObject({
+      schemaVersion: 1,
+      command: "run",
+      status: "policy_violation",
+      launched: false,
+      adapter: { id: "codex-exec", version: 1 },
+      categories: ["api_key"],
+    });
+    expect(writes.errors.join("")).not.toContain(secret);
+  });
+
+  it("blocks sensitive workspace context before agent execution", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "aiprivacy-agent-context-"));
+    temporaryDirectories.push(directory);
+    await writeFile(join(directory, "private.txt"), "Contact person@example.com", "utf8");
+    let launched = false;
+    const exitCode = await runCli(["run", "--", "codex", "exec", "Summarize this project."], {
+      cwd: directory,
+      launchAgent: () => {
+        launched = true;
+        return Promise.resolve(0);
+      },
+      writeOut: () => undefined,
+      writeError: () => undefined,
+      isInteractive: false,
+    });
+    expect(exitCode).toBe(ExitCode.policyViolation);
+    expect(launched).toBe(false);
+  });
+
   it("provides stable JSON and a policy-violation exit code", async () => {
     const writes = capture();
     const secret = `sk-proj-${"A1b2".repeat(8)}`;

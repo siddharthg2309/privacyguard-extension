@@ -1,9 +1,22 @@
 {
   "name": "@privacy-guard/cli",
-  "version": "0.2.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "Local-only AI Privacy Firewall command-line client.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/siddharthg2309/privacyguard-extension.git",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/siddharthg2309/privacyguard-extension#readme",
+  "bugs": "https://github.com/siddharthg2309/privacyguard-extension/issues",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "bin": {
     "aiprivacy": "dist/cli.cjs"
   },
@@ -17,6 +30,7 @@
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "package:check": "pnpm pack --pack-destination ../../artifacts",
+    "prepack": "tsup --config tsup.config.ts",
     "test:e2e": "pnpm build && vitest run --config vitest.e2e.config.ts"
   },
   "devDependencies": {

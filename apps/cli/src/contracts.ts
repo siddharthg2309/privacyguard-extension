@@ -1,4 +1,4 @@
-import { PrivacyDecisionSchema } from "@privacy-guard/contracts";
+import { DetectionCategorySchema, PrivacyDecisionSchema } from "@privacy-guard/contracts";
 import { z } from "zod";
 
 export const CliFormatSchema = z.enum(["human", "json"]);
@@ -69,6 +69,23 @@ export const DoctorOutputSchema = z
         })
         .strict(),
     ),
+  })
+  .strict();
+
+export const RunPolicyOutputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    command: z.literal("run"),
+    status: z.literal("policy_violation"),
+    launched: z.literal(false),
+    adapter: z
+      .object({
+        id: z.literal("codex-exec"),
+        version: z.literal(1),
+      })
+      .strict(),
+    violations: z.number().int().positive(),
+    categories: z.array(DetectionCategorySchema),
   })
   .strict();
 

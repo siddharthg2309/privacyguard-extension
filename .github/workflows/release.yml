@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release source
+        run: pnpm verify
+
+      - name: Audit all dependencies
+        run: pnpm audit --audit-level low
+
+      - name: Build release clients
+        run: pnpm build
+
+      - name: Run CLI E2E
+        run: pnpm test:e2e:cli
+
+      - name: Install Chromium
+        run: pnpm --filter @privacy-guard/browser-extension exec playwright install --with-deps chromium
+
+      - name: Run extension E2E
+        run: pnpm test:e2e:browser
+
+      - name: Build release artifacts
+        run: pnpm package:release
+
+      - name: Preserve first reproducible build
+        run: cp artifacts/release/SHA256SUMS /tmp/privacy-guard-first-build.sha256
+
+      - name: Rebuild release artifacts
+        run: pnpm package:release
+
+      - name: Verify reproducible artifacts
+        run: diff --unified /tmp/privacy-guard-first-build.sha256 artifacts/release/SHA256SUMS
+
+      - name: Test packaged CLI installation
+        run: node scripts/test-cli-install.mjs
+
+      - name: Sign release provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: artifacts/release/*
+
+      - name: Upload immutable workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: privacy-guard-${{ github.ref_name }}
+          path: artifacts/release/*
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/release/* --verify-tag --generate-notes --title "AI Privacy Firewall $GITHUB_REF_NAME"
+
+      - name: Publish npm package with provenance
+        if: ${{ vars.PUBLISH_NPM == 'true' }}
+        run: npm publish apps/cli --provenance --access public

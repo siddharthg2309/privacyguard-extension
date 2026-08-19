@@ -1,6 +1,6 @@
 {
   "name": "privacy-guard",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Local-first privacy protection for AI browser and CLI workflows.",
   "type": "module",
@@ -18,12 +18,15 @@
     "lint": "eslint .",
     "package:cli": "pnpm --filter @privacy-guard/cli package:check",
     "package:browser": "pnpm --filter @privacy-guard/browser-extension package:check",
+    "package:release": "node scripts/package-release.mjs",
+    "security:check": "node scripts/security-audit.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e:cli": "pnpm --filter @privacy-guard/cli test:e2e",
     "test:e2e:browser": "pnpm --filter @privacy-guard/browser-extension test:e2e",
+    "test:install:cli": "node scripts/test-cli-install.mjs",
     "typecheck": "tsc --noEmit && pnpm --filter @privacy-guard/browser-extension typecheck",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm architecture:check && pnpm test"
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm architecture:check && pnpm security:check && pnpm test"
   },
   "devDependencies": {
     "@privacy-guard/privacy-engine": "workspace:*",

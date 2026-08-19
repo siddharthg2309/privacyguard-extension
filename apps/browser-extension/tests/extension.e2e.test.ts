@@ -288,6 +288,29 @@ test("cancelling review never transmits the held content", async () => {
   await expect(page.locator("#transmission-count")).toHaveText("0");
 });
 
+test("review dialog exposes names, traps keyboard focus, and cancels with Escape", async () => {
+  await openHarness();
+  await submit("Contact person@example.com");
+
+  const dialog = page.getByRole("dialog", { name: "Review sensitive details" });
+  const cancel = page.getByRole("button", { name: "Cancel submission" });
+  const sanitized = page.getByRole("button", { name: "Send sanitized version" });
+  const preview = page.getByLabel("Exact outgoing content");
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(cancel).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(sanitized).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(preview).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(sanitized).toBeFocused();
+  await page.keyboard.press("Escape");
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#transmission-count")).toHaveText("0");
+});
+
 test("scanner failure fails closed and cannot resume", async () => {
   await openHarness("?scanner=failure");
   await submit("This must remain local");

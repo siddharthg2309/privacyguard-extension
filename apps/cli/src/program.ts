@@ -6,11 +6,13 @@ import { access, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { Readable } from "node:stream";
 
+import { inspectAgentInvocation, launchAgent, type AgentInspectionPlan } from "./agent-adapters.js";
 import { initializeCliConfig, loadCliConfig, resolveConfigPath } from "./configuration.js";
 import {
   CliFormatSchema,
   DoctorOutputSchema,
   RedactOutputSchema,
+  RunPolicyOutputSchema,
   StatusOutputSchema,
   type CliFormat,
 } from "./contracts.js";
@@ -19,7 +21,7 @@ import { discoverFiles, readTextFile } from "./filesystem.js";
 import { reportError, reportScan, sanitizedText, type Writer } from "./reporters.js";
 import { scanContent, scanPath, scanStdin } from "./scanning.js";
 
-const VERSION = "0.2.0";
+const VERSION = "1.0.0";
 
 export type CliRuntime = {
   input: Readable;
@@ -27,6 +29,8 @@ export type CliRuntime = {
   writeError: Writer;
   isInteractive: boolean;
   signal?: AbortSignal;
+  cwd: string;
+  launchAgent: (plan: AgentInspectionPlan, signal?: AbortSignal) => Promise<number>;
 };
 
 const defaultRuntime: CliRuntime = {
@@ -34,6 +38,8 @@ const defaultRuntime: CliRuntime = {
   writeOut: (value) => process.stdout.write(value),
   writeError: (value) => process.stderr.write(value),
   isInteractive: process.stdin.isTTY && process.stdout.isTTY,
+  cwd: process.cwd(),
+  launchAgent,
 };
 
 type GlobalOptions = { config?: string; format: CliFormat };
@@ -107,9 +113,9 @@ function progressReporter(
 export async function runCli(
   arguments_: readonly string[],
   runtimeOverrides: Partial<CliRuntime> = {},
-): Promise<ExitCodeValue> {
+): Promise<number> {
   const runtime: CliRuntime = { ...defaultRuntime, ...runtimeOverrides };
-  let exitCode: ExitCodeValue = ExitCode.success;
+  let exitCode: number = ExitCode.success;
   let activeCommand = "cli";
   const program = new Command();
   program
@@ -126,7 +132,7 @@ export async function runCli(
       writeErr: runtime.writeError,
     });
 
-  async function execute(command: string, operation: () => Promise<ExitCodeValue>): Promise<void> {
+  async function execute(command: string, operation: () => Promise<number>): Promise<void> {
     activeCommand = command;
     try {
       exitCode = await operation();
@@ -136,6 +142,79 @@ export async function runCli(
       exitCode = cliError.exitCode;
     }
   }
+
+  program
+    .command("run")
+    .description("scan a verified AI-agent invocation before starting it")
+    .argument("<agent-command...>", "agent executable and arguments; place them after --")
+    .action(async (agentCommand: string[]) => {
+      await execute("run", async () => {
+        const plan = inspectAgentInvocation({ command: agentCommand, cwd: runtime.cwd });
+        const { config } = await loadConfig(program);
+        const promptDecision = await scanContent(
+          plan.prompt,
+          `${plan.adapterId}:prompt`,
+          config,
+          runtime.signal,
+        );
+        const contextOutputs = [];
+        for (const contextRoot of plan.contextRoots) {
+          contextOutputs.push(
+            await scanPath(
+              "workspace.scan",
+              contextRoot,
+              config,
+              runtime.signal,
+              progressReporter(globalOptions(program).format, runtime.writeError),
+            ),
+          );
+        }
+
+        const violations =
+          (promptDecision.action === "allow" ? 0 : 1) +
+          contextOutputs.reduce((total, output) => total + output.summary.violations, 0);
+        const categories = [
+          ...new Set([
+            ...promptDecision.detections.map(({ category }) => category),
+            ...contextOutputs.flatMap(({ results }) =>
+              results.flatMap(({ decision }) =>
+                decision === undefined ? [] : decision.detections.map(({ category }) => category),
+              ),
+            ),
+          ]),
+        ].sort();
+        if (globalOptions(program).format === "human") {
+          runtime.writeError(
+            `Protected adapter: ${plan.adapterId}/v${plan.adapterVersion}\n` +
+              `Inspected: positional prompt and ${plan.contextRoots.length} workspace root(s)\n` +
+              plan.disclosures.map((value) => `Coverage: ${value}\n`).join(""),
+          );
+        }
+        if (violations > 0) {
+          runtime.writeError(
+            globalOptions(program).format === "json"
+              ? `${JSON.stringify(
+                  RunPolicyOutputSchema.parse({
+                    schemaVersion: 1,
+                    command: "run",
+                    status: "policy_violation",
+                    launched: false,
+                    adapter: { id: plan.adapterId, version: plan.adapterVersion },
+                    violations,
+                    categories,
+                  }),
+                )}\n`
+              : `BLOCK run (${violations} policy violation(s): ${categories.join(", ")}); the agent was not started.\n`,
+          );
+          return ExitCode.policyViolation;
+        }
+
+        if (globalOptions(program).format === "human") {
+          runtime.writeError("ALLOW run; starting the verified agent command.\n");
+        }
+        return runtime.launchAgent(plan, runtime.signal);
+      });
+    });
 
   program
     .command("scan [path]")
