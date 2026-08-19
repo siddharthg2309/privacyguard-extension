@@ -13,11 +13,11 @@ All sensitive processing—including PII detection, secret detection, risk scori
 
 ## Current status
 
-Phase 1 is complete. The repository now contains shared runtime contracts, content normalization, PII and secret detectors, sensitive-file classification, deterministic risk scoring, local policy evaluation, span-safe redaction, guarded configuration, safe diagnostics, and the reusable privacy-engine pipeline.
+Phases 1 and 2 are complete. The repository contains the shared privacy engine plus a production CLI foundation for macOS, Windows, and Linux.
 
-The Phase 1 quality baseline includes strict TypeScript and ESLint checks, architecture-boundary enforcement, 35 automated tests, property-based redaction testing, coverage reporting, package builds, and a local engine benchmark.
+The CLI provides file, directory, workspace, and standard-input scanning; safe redaction previews and explicitly authorized writes; human and versioned JSON output; local configuration; status and doctor checks; ignore rules; bounded streaming; cancellation; stable exit codes; and cross-platform E2E coverage.
 
-The browser extension and CLI applications will be built on top of this shared engine in later production milestones.
+The Chromium extension will be built on top of the same shared engine in the next production milestone.
 
 ## Architecture
 
@@ -43,7 +43,19 @@ corepack enable
 pnpm install --frozen-lockfile
 pnpm verify
 pnpm build
+pnpm test:e2e:cli
 ```
+
+Build and try the CLI:
+
+```bash
+pnpm --filter @privacy-guard/cli build
+node apps/cli/dist/cli.cjs doctor
+node apps/cli/dist/cli.cjs scan ./path/to/file
+printf 'Contact person@example.com' | node apps/cli/dist/cli.cjs scan --stdin
+```
+
+See [the CLI contract](docs/cli.md) for commands, safety behavior, JSON guarantees, and exit codes.
 
 Useful commands:
 

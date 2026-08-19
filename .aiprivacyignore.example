@@ -1,0 +1,5 @@
+# AI Privacy Firewall-specific exclusions.
+# Git-style patterns are evaluated relative to the workspace root.
+vendor/
+generated/
+*.min.js

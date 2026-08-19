@@ -1,0 +1,31 @@
+{
+  "name": "@privacy-guard/cli",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Local-only AI Privacy Firewall command-line client.",
+  "type": "module",
+  "bin": {
+    "aiprivacy": "dist/cli.cjs"
+  },
+  "exports": {
+    ".": "./dist/cli.cjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "package:check": "pnpm pack --pack-destination ../../artifacts",
+    "test:e2e": "pnpm build && vitest run --config vitest.e2e.config.ts"
+  },
+  "devDependencies": {
+    "@inquirer/prompts": "catalog:",
+    "@privacy-guard/configuration": "workspace:*",
+    "@privacy-guard/contracts": "workspace:*",
+    "@privacy-guard/privacy-engine": "workspace:*",
+    "commander": "catalog:",
+    "ignore": "catalog:",
+    "zod": "catalog:"
+  }
+}

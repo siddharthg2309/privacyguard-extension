@@ -2,6 +2,8 @@ node_modules/
 .pnpm-store/
 dist/
 coverage/
+artifacts/*
+!artifacts/.gitkeep
 .turbo/
 .vite/
 .wxt/

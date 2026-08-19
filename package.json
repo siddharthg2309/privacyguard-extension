@@ -15,8 +15,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "package:cli": "pnpm --filter @privacy-guard/cli package:check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e:cli": "pnpm --filter @privacy-guard/cli test:e2e",
     "typecheck": "tsc --noEmit",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm architecture:check && pnpm test"
   },
