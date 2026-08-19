@@ -30,6 +30,7 @@ jobs:
         with:
           output: codeql-results
           upload: false
+          upload-database: false
 
       - name: Enforce zero CodeQL findings
         run: node scripts/check-codeql-results.mjs codeql-results
