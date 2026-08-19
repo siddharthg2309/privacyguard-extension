@@ -15,7 +15,11 @@ const npmCache = join(sandbox, "npm cache");
 const fixture = join(sandbox, "customer file.txt");
 const config = join(sandbox, "configuration.json");
 const executable =
-  process.platform === "win32" ? join(prefix, "aiprivacy.cmd") : join(prefix, "bin", "aiprivacy");
+  process.platform === "win32" ? process.execPath : join(prefix, "bin", "aiprivacy");
+const executableArguments =
+  process.platform === "win32"
+    ? [join(prefix, "node_modules", "@privacy-guard", "cli", "dist", "cli.cjs")]
+    : [];
 const runtimeEnvironment = {
   ...process.env,
   PATH: `${dirname(process.execPath)}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`,
@@ -23,7 +27,10 @@ const runtimeEnvironment = {
 
 async function command(arguments_, expectedCode = 0, options = {}) {
   try {
-    const output = await execute(executable, arguments_, { env: runtimeEnvironment, ...options });
+    const output = await execute(executable, [...executableArguments, ...arguments_], {
+      env: runtimeEnvironment,
+      ...options,
+    });
     if (expectedCode !== 0) throw new Error(`Expected exit code ${expectedCode}.`);
     return output;
   } catch (error) {
@@ -44,7 +51,10 @@ async function command(arguments_, expectedCode = 0, options = {}) {
 
 async function commandWithInput(arguments_, input) {
   await new Promise((resolvePromise, reject) => {
-    const child = spawn(executable, arguments_, { env: runtimeEnvironment, windowsHide: true });
+    const child = spawn(executable, [...executableArguments, ...arguments_], {
+      env: runtimeEnvironment,
+      windowsHide: true,
+    });
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (value) => {
