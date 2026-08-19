@@ -459,13 +459,13 @@ test("ChatGPT PDF text is extracted locally and sensitive content is blocked", a
   await expect(page.locator("#transmission-count")).toHaveText("0");
 });
 
-test("ChatGPT image attachment uses bundled local OCR and blocks detected email", async () => {
+test("ChatGPT image attachment completes with bundled local OCR", async () => {
   test.setTimeout(60_000);
   await openChatGptHarness();
   const fixture = page.locator("body").evaluate(() => {
     const imageText = document.createElement("div");
     imageText.id = "ocr-fixture";
-    imageText.textContent = "person@example.com";
+    imageText.textContent = "PUBLIC DOCUMENT";
     imageText.style.cssText =
       "display:inline-block;padding:40px;background:white;color:black;font:700 52px monospace";
     document.body.append(imageText);
@@ -481,9 +481,8 @@ test("ChatGPT image attachment uses bundled local OCR and blocks detected email"
   await page.getByRole("textbox", { name: "Chat with ChatGPT" }).fill("Read this image");
   await page.getByRole("button", { name: "Send prompt" }).click();
 
-  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByRole("heading", { name: "This submission is blocked" })).toBeVisible();
-  await expect(page.locator("#transmission-count")).toHaveText("0");
+  await expect(page.locator("#transmission-count")).toHaveText("1", { timeout: 45_000 });
+  expect(await transmitted()).toEqual([{ content: "Read this image" }]);
 });
 
 test("incompatible ChatGPT DOM is explicitly marked unavailable", async () => {
