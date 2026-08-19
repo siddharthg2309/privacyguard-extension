@@ -65,6 +65,79 @@ const incompatibleChatGptHtml = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Incompatible ChatGPT harness</title></head>
 <body><main><p>No compatible composer is present.</p></main></body></html>`;
 
+const phaseFiveSites = [
+  {
+    id: "claude",
+    label: "Claude",
+    host: "claude.ai",
+    composerName: "Write your prompt to Claude",
+    sendName: "Send Message",
+    rootMarkup:
+      '<div data-cds="ChatComposer"><div data-cds="ChatComposerEditor"><div class="ProseMirror" role="textbox" aria-label="Write your prompt to Claude" contenteditable="true"><p><br></p></div></div><input aria-label="Attach test file" type="file"><div data-cds="MessageAttachments"></div><div data-cds="ChatComposerPrimaryAction"><button aria-label="Send Message" type="button">Send</button></div></div>',
+    composerSelector: '[data-cds="ChatComposerEditor"] .ProseMirror',
+    sendSelector: '[data-cds="ChatComposerPrimaryAction"] button',
+  },
+  {
+    id: "gemini",
+    label: "Gemini",
+    host: "gemini.google.com",
+    composerName: "Enter a prompt for Gemini",
+    sendName: "Send message",
+    rootMarkup:
+      '<div data-node-type="input-area"><rich-textarea enterkeyhint="send"><div class="ql-editor" role="textbox" aria-label="Enter a prompt for Gemini" aria-multiline="true" contenteditable="true"><p><br></p></div></rich-textarea><input aria-label="Attach test file" type="file"><div data-test-id="send-button-container"><button aria-label="Send message" type="button">Send</button></div></div>',
+    composerSelector: '[aria-label="Enter a prompt for Gemini"]',
+    sendSelector: 'button[aria-label="Send message"]',
+  },
+] as const;
+
+type PhaseFiveSite = (typeof phaseFiveSites)[number];
+
+function phaseFiveHarnessHtml(site: PhaseFiveSite): string {
+  return String.raw`<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>${site.label} adapter contract harness</title></head>
+  <body>
+    <main>
+      <div id="composer-slot"></div>
+      <button id="replace-composer" type="button">Replace composer</button>
+      <output id="transmission-count">0</output>
+    </main>
+    <script>
+      const rootMarkup = ${JSON.stringify(site.rootMarkup)};
+      const composerSelector = ${JSON.stringify(site.composerSelector)};
+      const sendSelector = ${JSON.stringify(site.sendSelector)};
+      function transmit(root) {
+        const composer = root.querySelector(composerSelector);
+        const transmissions = JSON.parse(document.body.dataset.transmissions || "[]");
+        transmissions.push({ content: composer.innerText.replace(/\n+$/, "") });
+        document.body.dataset.transmissions = JSON.stringify(transmissions);
+        document.querySelector("#transmission-count").textContent = String(transmissions.length);
+      }
+      function installComposer() {
+        const shell = document.createElement("div");
+        shell.innerHTML = rootMarkup;
+        const root = shell.firstElementChild;
+        const action = root.querySelector(sendSelector);
+        action.addEventListener("click", () => {
+          if (root.dataset.busy === "true" || action.getAttribute("aria-label").startsWith("Stop")) {
+            document.body.dataset.stopClicks = String(Number(document.body.dataset.stopClicks || "0") + 1);
+            return;
+          }
+          transmit(root);
+        });
+        document.querySelector("#composer-slot").replaceChildren(root);
+      }
+      document.querySelector("#replace-composer").addEventListener("click", installComposer);
+      installComposer();
+    </script>
+  </body>
+</html>`;
+}
+
+function incompatibleSiteHtml(site: PhaseFiveSite): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Incompatible ${site.label}</title></head><body><main>No compatible composer.</main></body></html>`;
+}
+
 async function openHarness(query = ""): Promise<void> {
   await page.goto(`${harnessUrl}${query}`);
   await expect(page.locator("form")).toBeVisible();
@@ -81,15 +154,24 @@ async function openChatGptHarness(pathname = "__privacy_guard_chatgpt_harness__"
   );
 }
 
+async function openPhaseFiveHarness(site: PhaseFiveSite): Promise<void> {
+  await page.goto(`https://${site.host}/__privacy_guard_${site.id}_harness__`);
+  await expect(page.locator("html")).toHaveAttribute("data-privacy-guard-protection-ready", "true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-privacy-guard-compatibility",
+    "protected",
+  );
+}
+
 async function submit(content: string): Promise<void> {
   await page.locator("textarea").fill(content);
   await page.getByRole("button", { name: "Submit", exact: true }).click();
 }
 
-async function transmitted(): Promise<{ content: string; requestId: string }[]> {
+async function transmitted(): Promise<{ content: string; requestId?: string }[]> {
   return page.locator("body").evaluate((body) => {
     const serialized = body.dataset.transmissions ?? "[]";
-    return JSON.parse(serialized) as { content: string; requestId: string }[];
+    return JSON.parse(serialized) as { content: string; requestId?: string }[];
   });
 }
 
@@ -104,6 +186,15 @@ test.beforeAll(async () => {
     const body = pathname === "/__privacy_guard_harness__" ? harnessHtml : chatGptHarnessHtml;
     return route.fulfill({ status: 200, contentType: "text/html", body });
   });
+  for (const site of phaseFiveSites) {
+    await context.route(`https://${site.host}/__privacy_guard_*`, (route) => {
+      const pathname = new URL(route.request().url()).pathname;
+      const body = pathname.endsWith("_incompatible__")
+        ? incompatibleSiteHtml(site)
+        : phaseFiveHarnessHtml(site);
+      return route.fulfill({ status: 200, contentType: "text/html", body });
+    });
+  }
   page = await context.newPage();
 });
 
@@ -310,4 +401,117 @@ test("incompatible ChatGPT DOM is explicitly marked unavailable", async () => {
     "data-privacy-guard-compatibility-error",
     "CHATGPT_COMPOSER_NOT_FOUND",
   );
+});
+
+for (const site of phaseFiveSites) {
+  test.describe(`${site.label} shared adapter contract`, () => {
+    test("button submission resumes exactly once", async () => {
+      await openPhaseFiveHarness(site);
+      await page.getByRole("textbox", { name: site.composerName }).fill("Explain binary search");
+      await page.getByRole("button", { name: site.sendName }).click();
+
+      await expect(page.locator("#transmission-count")).toHaveText("1");
+      expect(await transmitted()).toEqual([{ content: "Explain binary search" }]);
+    });
+
+    test("Enter keeps sensitive content local until sanitized approval", async () => {
+      await openPhaseFiveHarness(site);
+      const composer = page.getByRole("textbox", { name: site.composerName });
+      await composer.fill("Contact person@example.com");
+      await composer.press("Enter");
+
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.locator("#transmission-count")).toHaveText("0");
+      await expect(page.getByLabel("Exact outgoing content")).toHaveValue("Contact [EMAIL]");
+      await page.getByRole("button", { name: "Send sanitized version" }).click();
+      await expect(page.locator("#transmission-count")).toHaveText("1");
+      expect(await transmitted()).toEqual([{ content: "Contact [EMAIL]" }]);
+    });
+
+    test("Shift+Enter remains multiline and does not submit", async () => {
+      await openPhaseFiveHarness(site);
+      const composer = page.getByRole("textbox", { name: site.composerName });
+      await composer.fill("First line");
+      await composer.press("Shift+Enter");
+
+      await expect(page.locator("#transmission-count")).toHaveText("0");
+      await expect(page.getByRole("dialog")).toBeHidden();
+    });
+
+    test("stop-response controls are not treated as prompt submission", async () => {
+      await openPhaseFiveHarness(site);
+      await page.getByRole("textbox", { name: site.composerName }).fill("Unsent draft");
+      await page.locator(site.sendSelector).evaluate((button) => {
+        button.setAttribute("aria-label", "Stop response");
+        button.closest<HTMLElement>('[data-cds="ChatComposer"]')?.setAttribute("data-busy", "true");
+        if (button instanceof HTMLElement) button.click();
+      });
+
+      await expect(page.locator("body")).toHaveAttribute("data-stop-clicks", "1");
+      await expect(page.locator("#transmission-count")).toHaveText("0");
+      await expect(page.getByRole("dialog")).toBeHidden();
+    });
+
+    test("duplicate action and SPA replacement remain exact-once", async () => {
+      await openPhaseFiveHarness(site);
+      await page.getByRole("button", { name: "Replace composer" }).click();
+      await page.getByRole("textbox", { name: site.composerName }).fill("person@example.com");
+      await page.getByRole("button", { name: site.sendName }).evaluate((button) => {
+        if (button instanceof HTMLElement) {
+          button.click();
+          button.click();
+        }
+      });
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("button", { name: "Send sanitized version" }).click();
+
+      await expect(page.locator("#transmission-count")).toHaveText("1");
+      expect(await transmitted()).toEqual([{ content: "[EMAIL]" }]);
+    });
+
+    test("attachment submission fails closed", async () => {
+      await openPhaseFiveHarness(site);
+      await page.getByLabel("Attach test file").setInputFiles({
+        name: "private.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("synthetic fixture"),
+      });
+      await page.getByRole("textbox", { name: site.composerName }).fill("Review this file");
+      await page.getByRole("button", { name: site.sendName }).click();
+
+      await expect(page.getByRole("heading", { name: "Protection is unavailable" })).toBeVisible();
+      await expect(page.locator("#transmission-count")).toHaveText("0");
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-privacy-guard-compatibility-error",
+        "ATTACHMENT_INSPECTION_UNAVAILABLE",
+      );
+    });
+
+    test("incompatible DOM is explicitly unavailable", async () => {
+      await page.goto(`https://${site.host}/__privacy_guard_${site.id}_incompatible__`);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-privacy-guard-compatibility",
+        "protection_unavailable",
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-privacy-guard-compatibility-error",
+        `${site.id.toUpperCase()}_COMPOSER_NOT_FOUND`,
+      );
+    });
+  });
+}
+
+test("an incompatible Claude adapter cannot disable Gemini protection", async () => {
+  const claude = phaseFiveSites[0];
+  const gemini = phaseFiveSites[1];
+  await page.goto(`https://${claude.host}/__privacy_guard_${claude.id}_incompatible__`);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-privacy-guard-compatibility-error",
+    "CLAUDE_COMPOSER_NOT_FOUND",
+  );
+
+  await openPhaseFiveHarness(gemini);
+  await page.getByRole("textbox", { name: gemini.composerName }).fill("Independent safe prompt");
+  await page.getByRole("button", { name: gemini.sendName }).click();
+  await expect(page.locator("#transmission-count")).toHaveText("1");
 });

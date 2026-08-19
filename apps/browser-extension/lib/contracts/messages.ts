@@ -7,6 +7,9 @@ export const BRIDGE_COMMAND_EVENT = "privacy-guard:submission-command";
 export const BRIDGE_COMMAND_RESULT_EVENT = "privacy-guard:submission-command-result";
 export const BRIDGE_STATUS_EVENT = "privacy-guard:adapter-status";
 
+export const PageAdapterIdSchema = z.enum(["chatgpt", "claude", "gemini"]);
+export type PageAdapterId = z.infer<typeof PageAdapterIdSchema>;
+
 export const PageAttachmentSchema = z
   .object({
     id: z.string().min(1),
@@ -65,7 +68,7 @@ export const PageAdapterStatusSchema = z
   .object({
     schemaVersion: z.literal(1),
     type: z.literal("ADAPTER_STATUS"),
-    adapterId: z.literal("chatgpt"),
+    adapterId: PageAdapterIdSchema,
     status: z.enum(["protected", "protection_unavailable"]),
     errorCode: z.string().min(1).optional(),
   })

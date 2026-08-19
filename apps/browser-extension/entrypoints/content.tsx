@@ -33,7 +33,6 @@ export default defineContentScript({
     const adapterId = adapterForHost(location.hostname);
     const isControlledHarness =
       import.meta.env.MODE === "e2e" && location.pathname === "/__privacy_guard_harness__";
-    const isChatGpt = adapterId === "chatgpt";
     if (!stored.settings.enabled) {
       await browser.runtime.sendMessage({
         schemaVersion: 1,
@@ -44,17 +43,6 @@ export default defineContentScript({
       });
       return;
     }
-    if (!isControlledHarness && !isChatGpt) {
-      await browser.runtime.sendMessage({
-        schemaVersion: 1,
-        type: "SET_COMPATIBILITY",
-        adapterId,
-        status: "unsupported",
-        errorCode: "ADAPTER_NOT_IMPLEMENTED",
-      });
-      return;
-    }
-
     const ui = await createShadowRootUi(ctx, {
       name: "privacy-guard-review",
       position: "modal",

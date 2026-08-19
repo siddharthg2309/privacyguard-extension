@@ -13,11 +13,11 @@ All sensitive processing—including PII detection, secret detection, risk scori
 
 ## Current status
 
-Phases 1 through 4 are complete. The repository contains the shared privacy engine, a production CLI foundation for macOS, Windows, and Linux, the Chromium extension platform, and the ChatGPT site adapter.
+Phases 1 through 5 are complete. The repository contains the shared privacy engine, a production CLI foundation for macOS, Windows, and Linux, the Chromium extension platform, and production adapters for ChatGPT, Claude, and Gemini.
 
 The CLI provides file, directory, workspace, and standard-input scanning; safe redaction previews and explicitly authorized writes; human and versioned JSON output; local configuration; status and doctor checks; ignore rules; bounded streaming; cancellation; stable exit codes; and cross-platform E2E coverage.
 
-The extension platform includes a least-privilege WXT Manifest V3 build, validated main-world/isolated-world messaging, a fail-closed submission state machine, inline scanning worker, isolated Shadow DOM review UI, onboarding, popup, local dashboard, versioned storage, and controlled Chromium E2E tests. The ChatGPT adapter protects compatible prompt submissions through the send button, Enter key, and form fallback while surviving SPA composer replacement. Claude and Gemini remain explicitly unsupported until Phase 5.
+The extension platform includes a least-privilege WXT Manifest V3 build, validated main-world/isolated-world messaging, a fail-closed submission state machine, inline scanning worker, isolated Shadow DOM review UI, onboarding, popup, local dashboard, versioned storage, and controlled Chromium E2E tests. Site-specific ChatGPT, Claude, and Gemini adapters protect compatible send-button and Enter workflows, preserve multiline input, survive SPA composer replacement, prevent duplicate continuation, and explicitly disable protection when compatibility cannot be guaranteed.
 
 ## Architecture
 

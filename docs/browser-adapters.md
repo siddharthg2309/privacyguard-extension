@@ -1,6 +1,6 @@
 # Browser Adapter Contract
 
-Browser adapters are the only components allowed to know an AI site's DOM and submission behavior. They translate a supported composer into the versioned page bridge without importing detector or policy implementation details.
+Browser adapters are the only components allowed to know an AI site's DOM and submission behavior. They translate a supported composer into the versioned page bridge without importing detector or policy implementation details. All adapters use one shared interception engine; their configuration contains only site-specific semantic selectors and labels.
 
 ## ChatGPT adapter
 
@@ -44,9 +44,51 @@ A document-level `MutationObserver` re-runs the capability probe as ChatGPT navi
 
 If the composer is replaced while a review is open, the old request cannot resume into the new composer. The adapter fails closed with `CHATGPT_COMPOSER_REPLACED` and the isolated controller records `ADAPTER_RESUME_FAILED`.
 
-### Attachments
+## Claude adapter
 
-Phase 4 detects attachment metadata and prevents the submission from continuing. Because Phase 6 extraction and OCR are not implemented yet, the extension reports `ATTACHMENT_INSPECTION_UNAVAILABLE`. It never treats an uninspected attachment as safe.
+The Claude adapter supports `claude.ai`. It relies on Claude's first-party component boundaries rather than generated utility classes:
+
+- `[data-cds="ChatComposer"]` is the owned composer boundary.
+- `[data-cds="ChatComposerEditor"]` owns the Tiptap/ProseMirror contenteditable editor.
+- `[data-cds="ChatComposerPrimaryAction"]` owns the send action.
+- The composer must not report `data-busy="true"`; this excludes the stop action shown during generation without depending on a localized label.
+- `[data-cds="MessageAttachments"]` is the attachment-preview boundary.
+
+The adapter intercepts button and unmodified Enter submission. Shift+Enter remains multiline. Claude does not expose a native form submission boundary in this component contract, so the adapter does not claim a form workflow.
+
+## Gemini adapter
+
+The Gemini adapter supports `gemini.google.com`. Its compatibility probe uses the live semantic structure:
+
+- a contenteditable textbox with `aria-label="Enter a prompt for Gemini"`;
+- the nearest `[data-node-type="input-area"]` boundary;
+- a `button[aria-label="Send message"]` continuation control;
+- composer previews plus selected file inputs for attachment presence.
+
+The adapter understands Gemini's Quill editor, button workflow, unmodified Enter submission, Shift+Enter multiline behavior, and SPA input-area replacement. It deliberately ignores dictate, mode, tools, stop-response, and regeneration controls.
+
+## Attachments
+
+The adapters detect attachment metadata and prevent the submission from continuing. Because Phase 6 extraction and OCR are not implemented yet, the extension reports `ATTACHMENT_INSPECTION_UNAVAILABLE`. It never treats an uninspected attachment as safe.
+
+## Support matrix
+
+| Site    | Domain                                  | Button    | Enter     | Shift+Enter | SPA replacement | Attachments                     |
+| ------- | --------------------------------------- | --------- | --------- | ----------- | --------------- | ------------------------------- |
+| ChatGPT | `chatgpt.com`, legacy `chat.openai.com` | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
+| Claude  | `claude.ai`                             | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
+| Gemini  | `gemini.google.com`                     | Protected | Protected | Preserved   | Protected       | Detected; blocked until Phase 6 |
+
+Retry, regenerate, stop-response, voice, and model/tool controls are not new prompt submissions and are intentionally outside the interception selectors. Pasted text is read from the same composer at submission time and receives the same scan as typed text.
+
+| Browser             | ChatGPT | Claude | Gemini | Release validation                                |
+| ------------------- | ------- | ------ | ------ | ------------------------------------------------- |
+| Playwright Chromium | Yes     | Yes    | Yes    | Automated loaded-extension contract suite         |
+| Google Chrome       | Target  | Target | Target | Store or manually installed release certification |
+| Microsoft Edge      | Target  | Target | Target | Store or manually installed release certification |
+| Brave               | Target  | Target | Target | Manually installed release compatibility matrix   |
+
+Automated release validation uses the extension-capable Playwright Chromium build. Chrome and Edge are primary distribution targets and Brave is a compatibility target; branded-browser certification uses a store or manually installed release because modern branded Chrome and Edge disable command-line extension side-loading. `Target` means the Manifest V3 build and adapter contract support that browser, not that an uninstalled extension was counted as a passing run.
 
 ## Compatibility truth
 
@@ -60,7 +102,7 @@ Status storage contains only adapter ID, status, error code, and check time.
 
 ## Verification
 
-The loaded-extension suite covers:
+The shared loaded-extension suite covers all three adapters and includes:
 
 - button, Enter, and form-fallback submissions;
 - Shift+Enter non-submission behavior;
