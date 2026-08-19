@@ -2,17 +2,18 @@ import { createEnvelope } from "@privacy-guard/testing-fixtures";
 import { privacyEngine } from "@privacy-guard/privacy-engine";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PageCaptureMessage } from "../contracts/messages.js";
+import type { PageAttachment, PageCaptureMessage } from "../contracts/messages.js";
 import type { ProtectionState } from "../state/protection-machine.js";
 import { ProtectionController, type ScannerPort } from "./protection-controller.js";
 
-function capture(content: string): PageCaptureMessage {
+function capture(content: string, attachments: PageAttachment[] = []): PageCaptureMessage {
   return {
     schemaVersion: 1,
     type: "PAGE_CAPTURE",
     requestId: crypto.randomUUID(),
     content,
     sourceLabel: "controlled-harness",
+    attachments,
   };
 }
 
@@ -103,6 +104,45 @@ describe("protection controller", () => {
     });
     await controller.handleCapture(capture("sensitive"));
     expect(onProtectionUnavailable).toHaveBeenCalledWith("DETECTOR_EXECUTION_FAILED");
+  });
+
+  it("fails closed when an attachment cannot yet be inspected", async () => {
+    const scanner = { scan: vi.fn() };
+    const onProtectionUnavailable = vi.fn().mockResolvedValue(undefined);
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const controller = new ProtectionController({
+      locale: "en-US",
+      scanTimeoutMs: 100,
+      scanner,
+      submission: { resume: vi.fn(), cancel },
+      view: { render: vi.fn() },
+      onProtectionUnavailable,
+    });
+    await controller.handleCapture(
+      capture("Review this file", [{ id: "file-1", name: "private.pdf", sizeBytes: 128 }]),
+    );
+    expect(scanner.scan).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(onProtectionUnavailable).toHaveBeenCalledWith("ATTACHMENT_INSPECTION_UNAVAILABLE");
+    expect(controller.getState().status).toBe("PROTECTION_UNAVAILABLE");
+  });
+
+  it("does not complete when the page adapter fails to resume", async () => {
+    const onProtectionUnavailable = vi.fn().mockResolvedValue(undefined);
+    const controller = new ProtectionController({
+      locale: "en-US",
+      scanTimeoutMs: 100,
+      scanner: { scan: async (envelope, signal) => privacyEngine.scan(envelope, signal) },
+      submission: {
+        resume: vi.fn().mockRejectedValue(new Error("adapter changed")),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      },
+      view: { render: vi.fn() },
+      onProtectionUnavailable,
+    });
+    await controller.handleCapture(capture("Safe prompt"));
+    expect(controller.getState().status).toBe("PROTECTION_UNAVAILABLE");
+    expect(onProtectionUnavailable).toHaveBeenCalledWith("ADAPTER_RESUME_FAILED");
   });
 
   it("rejects a duplicate concurrent capture", async () => {

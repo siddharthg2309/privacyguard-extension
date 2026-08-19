@@ -1,6 +1,7 @@
 import {
   BRIDGE_CAPTURE_EVENT,
   BRIDGE_COMMAND_EVENT,
+  BRIDGE_COMMAND_RESULT_EVENT,
   PageCommandMessageSchema,
   type PageCaptureMessage,
 } from "../contracts/messages.js";
@@ -30,6 +31,7 @@ export function installControlledMainWorldBridge(): () => void {
       requestId,
       content: input.value,
       sourceLabel: "controlled-harness",
+      attachments: [],
     };
     pending.set(requestId, { form, input, originalContent: input.value });
     form.dataset.privacyGuardState = "captured";
@@ -54,6 +56,7 @@ export function installControlledMainWorldBridge(): () => void {
     pending.delete(parsed.data.requestId);
     if (parsed.data.type === "CANCEL") {
       submission.form.dataset.privacyGuardState = "cancelled";
+      dispatchResult(parsed.data.requestId, "cancelled");
       return;
     }
     submission.input.value = parsed.data.content ?? submission.originalContent;
@@ -63,6 +66,7 @@ export function installControlledMainWorldBridge(): () => void {
         detail: { requestId: parsed.data.requestId, content: submission.input.value },
       }),
     );
+    dispatchResult(parsed.data.requestId, "resumed");
   };
 
   document.addEventListener("submit", intercept, true);
@@ -73,4 +77,12 @@ export function installControlledMainWorldBridge(): () => void {
     document.removeEventListener("submit", intercept, true);
     document.removeEventListener(BRIDGE_COMMAND_EVENT, command);
   };
+}
+
+function dispatchResult(requestId: string, outcome: "resumed" | "cancelled"): void {
+  document.dispatchEvent(
+    new CustomEvent(BRIDGE_COMMAND_RESULT_EVENT, {
+      detail: JSON.stringify({ schemaVersion: 1, type: "COMMAND_RESULT", requestId, outcome }),
+    }),
+  );
 }

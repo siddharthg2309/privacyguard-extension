@@ -46,6 +46,25 @@ describe("protection state machine", () => {
     });
   });
 
+  it("moves a failed adapter acknowledgement to protection unavailable", async () => {
+    const requestId = crypto.randomUUID();
+    const decision = await privacyEngine.scan(createEnvelope("Safe prompt", { requestId }));
+    let state = advance(initialProtectionState, { type: "INTERCEPT", requestId });
+    state = advance(state, { type: "CAPTURE", requestId, content: "Safe prompt" });
+    state = advance(state, { type: "START_SCAN", requestId });
+    state = advance(state, { type: "SCAN_DECIDED", requestId, decision });
+    state = advance(state, { type: "REQUEST_RESUME", requestId });
+    state = advance(state, {
+      type: "RESUME_FAILED",
+      requestId,
+      errorCode: "ADAPTER_RESUME_FAILED",
+    });
+    expect(state).toMatchObject({
+      status: "PROTECTION_UNAVAILABLE",
+      errorCode: "ADAPTER_RESUME_FAILED",
+    });
+  });
+
   it("rejects stale request identifiers", () => {
     const requestId = crypto.randomUUID();
     const state = advance(initialProtectionState, { type: "INTERCEPT", requestId });

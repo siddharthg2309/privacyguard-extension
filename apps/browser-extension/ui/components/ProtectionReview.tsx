@@ -68,6 +68,12 @@ export function ProtectionReview({
       : state.status === "BLOCKED"
         ? "This submission is blocked"
         : "Review sensitive details";
+  const unavailableDescription =
+    state.errorCode === "ATTACHMENT_INSPECTION_UNAVAILABLE"
+      ? "The attachment is still held locally, but this version cannot inspect its contents. Remove it and try again."
+      : state.errorCode === "ADAPTER_RESUME_FAILED"
+        ? "The page changed before the approved content could continue. Nothing was sent; review the current composer and try again."
+        : "The local scanner or page adapter could not produce a trustworthy result. The submission was cancelled.";
 
   return (
     <div className="backdrop">
@@ -87,8 +93,7 @@ export function ProtectionReview({
             "Potentially sensitive details were found. Review the exact sanitized version before continuing."}
           {state.status === "BLOCKED" &&
             "A critical secret or credential was detected. Nothing has been transmitted."}
-          {unavailable &&
-            "The local scanner could not produce a trustworthy decision. The submission was cancelled."}
+          {unavailable && unavailableDescription}
         </p>
         {scanning && <div className="progress" aria-label="Scanning locally" />}
         {categories.length > 0 && (

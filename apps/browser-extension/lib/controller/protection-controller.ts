@@ -54,7 +54,7 @@ function createBrowserEnvelope(capture: PageCaptureMessage, locale: string): Con
         label: capture.sourceLabel,
       },
     ],
-    attachments: [],
+    attachments: capture.attachments.map((attachment) => ({ ...attachment })),
     context: { locale, sourceLabel: capture.sourceLabel },
     capabilities: {
       canCaptureText: true,
@@ -90,6 +90,16 @@ export class ProtectionController {
     this.move({ type: "CAPTURE", requestId: capture.requestId, content: capture.content });
     this.move({ type: "START_SCAN", requestId: capture.requestId });
     this.options.view.render(this.state, this.actions());
+
+    if (capture.attachments.length > 0) {
+      const errorCode = "ATTACHMENT_INSPECTION_UNAVAILABLE";
+      this.move({ type: "SCAN_FAILED", requestId: capture.requestId, errorCode });
+      this.move({ type: "MARK_UNAVAILABLE", requestId: capture.requestId, errorCode });
+      await this.options.onProtectionUnavailable?.(errorCode).catch(() => undefined);
+      await this.options.submission.cancel(capture.requestId).catch(() => undefined);
+      this.options.view.render(this.state, this.actions());
+      return;
+    }
 
     const controller = new AbortController();
     this.activeScan = controller;
@@ -156,8 +166,14 @@ export class ProtectionController {
     const requestId = this.state.requestId;
     if (requestId === undefined) return;
     this.move({ type: "REQUEST_RESUME", requestId });
-    await this.options.submission.resume(requestId, content);
-    this.move({ type: "RESUME_SUCCEEDED", requestId });
+    try {
+      await this.options.submission.resume(requestId, content);
+      this.move({ type: "RESUME_SUCCEEDED", requestId });
+    } catch {
+      const errorCode = "ADAPTER_RESUME_FAILED";
+      this.move({ type: "RESUME_FAILED", requestId, errorCode });
+      await this.options.onProtectionUnavailable?.(errorCode).catch(() => undefined);
+    }
     this.options.view.render(this.state, this.actions());
   }
 

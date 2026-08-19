@@ -1,6 +1,6 @@
 # Browser Extension Platform
 
-Phase 3 provides the production browser foundation for AI Privacy Firewall. It does not yet claim live-site protection: ChatGPT is implemented in Phase 4, and Claude and Gemini in Phase 5.
+Phase 3 provides the production browser foundation for AI Privacy Firewall. Phase 4 adds the ChatGPT adapter. Claude and Gemini remain Phase 5 work and are explicitly reported as unsupported.
 
 ## Architecture
 
@@ -55,7 +55,8 @@ The suite verifies manifest permissions, exact-once safe resume, zero transmissi
 
 ## Current capability truth
 
-- The platform and controlled harness are implemented and tested.
-- Production builds explicitly report `ADAPTER_NOT_IMPLEMENTED` rather than claiming protection on live AI sites.
-- Prompt and attachment selectors, SPA lifecycle handling, and site compatibility probes belong to the site-adapter phases.
+- The platform, controlled harness, and ChatGPT adapter are implemented and tested.
+- ChatGPT prompt submission is protected only while its complete compatibility probe passes.
+- Claude and Gemini report `ADAPTER_NOT_IMPLEMENTED` rather than claiming protection.
+- ChatGPT attachments are intercepted but fail closed with `ATTACHMENT_INSPECTION_UNAVAILABLE` until Phase 6 can inspect their contents.
 - Image, PDF, OCR, and supported-document processing belongs to Phase 6.

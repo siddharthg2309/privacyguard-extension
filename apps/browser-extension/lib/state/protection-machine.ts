@@ -33,6 +33,7 @@ export type ProtectionEvent =
   | { type: "REQUEST_REDACTION"; requestId: string }
   | { type: "REQUEST_RESUME"; requestId: string }
   | { type: "RESUME_SUCCEEDED"; requestId: string }
+  | { type: "RESUME_FAILED"; requestId: string; errorCode: string }
   | { type: "CANCEL"; requestId: string }
   | { type: "RESET" };
 
@@ -120,6 +121,10 @@ export function transitionProtectionState(
     case "RESUME_SUCCEEDED":
       return state.status === "RESUMING"
         ? success({ ...state, status: "COMPLETE" })
+        : invalid(state);
+    case "RESUME_FAILED":
+      return state.status === "RESUMING"
+        ? success({ ...state, status: "PROTECTION_UNAVAILABLE", errorCode: event.errorCode })
         : invalid(state);
     case "CANCEL":
       return [

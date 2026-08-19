@@ -31,8 +31,9 @@ export default defineContentScript({
   main: async (ctx) => {
     const stored = await loadStoredState();
     const adapterId = adapterForHost(location.hostname);
-    const isHarness =
+    const isControlledHarness =
       import.meta.env.MODE === "e2e" && location.pathname === "/__privacy_guard_harness__";
+    const isChatGpt = adapterId === "chatgpt";
     if (!stored.settings.enabled) {
       await browser.runtime.sendMessage({
         schemaVersion: 1,
@@ -43,7 +44,7 @@ export default defineContentScript({
       });
       return;
     }
-    if (!isHarness) {
+    if (!isControlledHarness && !isChatGpt) {
       await browser.runtime.sendMessage({
         schemaVersion: 1,
         type: "SET_COMPATIBILITY",
@@ -54,7 +55,6 @@ export default defineContentScript({
       return;
     }
 
-    await injectScript("/main-world.js");
     const ui = await createShadowRootUi(ctx, {
       name: "privacy-guard-review",
       position: "modal",
@@ -69,9 +69,27 @@ export default defineContentScript({
     if (view === undefined) return;
 
     const submission = new DomSubmissionPort();
+    const stopStatus = submission.onStatus((status) => {
+      if (import.meta.env.MODE === "e2e") {
+        document.documentElement.dataset.privacyGuardCompatibility = status.status;
+        document.documentElement.dataset.privacyGuardCompatibilityError = status.errorCode ?? "";
+      }
+      void browser.runtime
+        .sendMessage({
+          schemaVersion: 1,
+          type: "SET_COMPATIBILITY",
+          adapterId: status.adapterId,
+          status: status.status,
+          ...(status.errorCode === undefined ? {} : { errorCode: status.errorCode }),
+        })
+        .catch(() => undefined);
+    });
     let disposeScanner = (): void => undefined;
     let scanner: ScannerPort;
-    if (new URL(location.href).searchParams.get("scanner") === "failure") {
+    if (
+      import.meta.env.MODE === "e2e" &&
+      new URL(location.href).searchParams.get("scanner") === "failure"
+    ) {
       scanner = {
         scan: () => Promise.reject(new Error("CONTROLLED_SCANNER_FAILURE")),
       };
@@ -91,7 +109,9 @@ export default defineContentScript({
       submission,
       view: {
         render: (state, actions) => {
-          document.documentElement.dataset.privacyGuardLastState = state.status;
+          if (import.meta.env.MODE === "e2e") {
+            document.documentElement.dataset.privacyGuardLastState = state.status;
+          }
           view.render(state, actions);
         },
       },
@@ -111,6 +131,10 @@ export default defineContentScript({
         },
       },
       onProtectionUnavailable: async (errorCode) => {
+        if (import.meta.env.MODE === "e2e") {
+          document.documentElement.dataset.privacyGuardCompatibility = "protection_unavailable";
+          document.documentElement.dataset.privacyGuardCompatibilityError = errorCode;
+        }
         await browser.runtime.sendMessage({
           schemaVersion: 1,
           type: "SET_COMPATIBILITY",
@@ -121,22 +145,32 @@ export default defineContentScript({
       },
     });
     const stopCapture = submission.onCapture((capture) => {
-      document.documentElement.dataset.privacyGuardCaptureReceived = "true";
+      if (import.meta.env.MODE === "e2e") {
+        document.documentElement.dataset.privacyGuardCaptureReceived = "true";
+      }
       void controller.handleCapture(capture);
     });
-    document.documentElement.dataset.privacyGuardProtectionReady = "true";
-    await browser.runtime.sendMessage({
-      schemaVersion: 1,
-      type: "SET_COMPATIBILITY",
-      adapterId,
-      status: "protected",
-    });
+    if (import.meta.env.MODE === "e2e") {
+      document.documentElement.dataset.privacyGuardProtectionReady = "true";
+    }
+    await injectScript("/main-world.js");
+    if (isControlledHarness) {
+      await browser.runtime.sendMessage({
+        schemaVersion: 1,
+        type: "SET_COMPATIBILITY",
+        adapterId,
+        status: "protected",
+      });
+    }
 
     ctx.onInvalidated(() => {
       delete document.documentElement.dataset.privacyGuardProtectionReady;
       delete document.documentElement.dataset.privacyGuardCaptureReceived;
       delete document.documentElement.dataset.privacyGuardLastState;
+      delete document.documentElement.dataset.privacyGuardCompatibility;
+      delete document.documentElement.dataset.privacyGuardCompatibilityError;
       stopCapture();
+      stopStatus();
       disposeScanner();
       ui.remove();
     });

@@ -4,6 +4,18 @@ import { z } from "zod";
 
 export const BRIDGE_CAPTURE_EVENT = "privacy-guard:submission-captured";
 export const BRIDGE_COMMAND_EVENT = "privacy-guard:submission-command";
+export const BRIDGE_COMMAND_RESULT_EVENT = "privacy-guard:submission-command-result";
+export const BRIDGE_STATUS_EVENT = "privacy-guard:adapter-status";
+
+export const PageAttachmentSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1).max(512),
+    mediaType: z.string().min(1).max(255).optional(),
+    sizeBytes: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type PageAttachment = z.infer<typeof PageAttachmentSchema>;
 
 export const PageCaptureMessageSchema = z
   .object({
@@ -12,6 +24,7 @@ export const PageCaptureMessageSchema = z
     requestId: z.uuid(),
     content: z.string().max(1_000_000),
     sourceLabel: z.string().min(1).max(120),
+    attachments: z.array(PageAttachmentSchema).max(32).default([]),
   })
   .strict();
 export type PageCaptureMessage = z.infer<typeof PageCaptureMessageSchema>;
@@ -36,6 +49,28 @@ export const PageCommandMessageSchema = z
     }
   });
 export type PageCommandMessage = z.infer<typeof PageCommandMessageSchema>;
+
+export const PageCommandResultSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    type: z.literal("COMMAND_RESULT"),
+    requestId: z.uuid(),
+    outcome: z.enum(["resumed", "cancelled", "failed"]),
+    errorCode: z.string().min(1).optional(),
+  })
+  .strict();
+export type PageCommandResult = z.infer<typeof PageCommandResultSchema>;
+
+export const PageAdapterStatusSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    type: z.literal("ADAPTER_STATUS"),
+    adapterId: z.literal("chatgpt"),
+    status: z.enum(["protected", "protection_unavailable"]),
+    errorCode: z.string().min(1).optional(),
+  })
+  .strict();
+export type PageAdapterStatus = z.infer<typeof PageAdapterStatusSchema>;
 
 export const WorkerScanRequestSchema = z
   .object({
