@@ -1,24 +1,62 @@
+# Dependencies and package-manager state.
 node_modules/
 .pnpm-store/
+.npm/
+.yarn/
+.pnp.*
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build output and local caches.
 dist/
+build/
 coverage/
-artifacts/*
-!artifacts/.gitkeep
+.nyc_output/
+*.lcov
+*.tsbuildinfo
+.cache/
+.eslintcache
+.parcel-cache/
+.rollup.cache/
 .turbo/
 .vite/
 .wxt/
 .output/
+
+# Test and browser automation output.
 test-results/
 playwright-report/
 blob-report/
-*.tsbuildinfo
+
+# Release archives and generated release inputs. Keep the directory marker.
+artifacts/*
+!artifacts/.gitkeep
+*.tgz
+
+# Logs and temporary files.
 *.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.orig
+
+# Operating-system and editor metadata.
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
+.history/
+
+# Local credentials and environment configuration.
 .env
 .env.*
 !.env.example
+.envrc
+.direnv/
 
 # Local planning documents; README.md remains public.
 project.md
