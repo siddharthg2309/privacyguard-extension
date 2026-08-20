@@ -6,7 +6,7 @@
 [![Chromium Manifest V3](https://img.shields.io/badge/Chromium-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![License](https://img.shields.io/badge/license-pending%20selection-orange)](#license)
 
-AI Privacy Firewall is a local-first, open-source-ready project for checking sensitive content before it reaches an AI service. It provides two clients:
+AI Privacy Firewall is a local-first project for checking sensitive content before it reaches an AI service. It provides two clients:
 
 - a Chromium Manifest V3 extension for ChatGPT, Claude, and Gemini;
 - a cross-platform CLI for macOS, Windows, and Linux.
